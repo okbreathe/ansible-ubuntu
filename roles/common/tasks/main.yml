@@ -1,0 +1,169 @@
+---
+- name: users | Add sudo group
+  group: name=sudo state=present
+
+- name: users | configure sudoers
+  lineinfile: "dest=/etc/sudoers state=present regexp='^%sudo' line='%sudo ALL=(ALL:ALL) ALL'"
+
+- name: users | Add users
+  user: name={{item.name}} shell={{item.shell}} groups={{item.groups}} password={{item.password}} state=present
+  with_items: ssh_users
+
+- name: users | Add ssh user keys
+  authorized_key: user={{ item.name }} key="{{ item.key }}"
+  with_items: ssh_users
+
+- name: base | Set hostname.
+  hostname: name={{ hostname }}
+
+- name: base | set locale
+  locale_gen: name={{locale}} state=present
+
+- name: base | Set /etc/localtime to {{ timezone }}
+  copy: src=/usr/share/zoneinfo/{{ timezone }} dest=/etc/localtime owner=root group=root mode=0644 backup=yes
+  notify:
+    - update timezone
+
+- name: base | Performing dist-upgrade.
+  apt: upgrade=dist
+
+- name: base | Installing common packages.
+  apt: state=present pkg={{ item }} update_cache=yes
+  with_items:
+    - ack-grep
+    - autoconf
+    - automake
+    - bash-completion
+    - bison
+    - build-essential
+    - curl
+    - dnsutils
+    - fail2ban
+    - git
+    - htop
+    - imagemagick
+    - libmysqlclient-dev 
+    - libpq-dev
+    - libreadline6
+    - libreadline6-dev
+    - libsqlite3-dev
+    - libssl-dev
+    - libxml2-dev
+    - libxslt1-dev
+    - libyaml-dev
+    - logrotate
+    - mlocate
+    - mysql-client
+    - mysql-common
+    - mysql-server 
+    - nginx
+    - nodejs
+    - ntp
+    - openssl
+    - openssl
+    - php5-cgi 
+    - php5-cli 
+    - php5-fpm
+    - php5-mysql
+    - pkg-config
+    - postgresql-9.3
+    - postgresql-contrib
+    - postgis
+    - python-mysqldb
+    - python-psycopg2
+    - rar
+    - screen
+    - sudo
+    - supervisor
+    - tree
+    - unzip
+    - vim
+    - wget
+    - zip
+    - zlib1g
+    - zlib1g-dev
+    - zsh
+
+- name: base | Use a proper editor
+  alternatives: name=editor path=/usr/bin/vim.basic
+
+- name: mysql | Copy the my.cnf file
+  template: src=my.cnf.{{ ansible_os_family }}.j2 dest={{ mysql_conf_dir }}/my.cnf
+  notify:
+    - restart mysql
+
+- name: mysql | Start the mysql service
+  service: name={{ mysql_service }} state=started enabled=yes
+
+- name: mysql | copy .my.cnf file with root password credentials
+  template: src=.my.cnf.j2 dest=~/.my.cnf mode=0600
+
+- name: mysql | update mysql root password for all root accounts
+  mysql_user: name=root host={{ item }} password={{ mysql_root_db_pass }}
+  with_items:
+    - "{{ ansible_hostname }}"
+    - 127.0.0.1
+    - ::1
+
+- name: mysql | ensure anonymous users are not in the database
+  mysql_user: name='' host={{ item }} state=absent
+  with_items:
+    - localhost
+    - "{{ inventory_hostname }}"
+
+- name: mysql | remove the test database
+  mysql_db: name=test state=absent
+
+- name: postgres | create postgres databases
+  postgresql_db: name={{item.name}}
+  with_items: ssh_users
+  sudo: yes
+  sudo_user: "{{postgresql_admin_user}}"
+
+- name: postgres | ensure user has access to database
+  postgresql_user: db={{item.name}} name={{item.name}} priv=ALL
+  with_items: ssh_users
+  sudo: yes
+  sudo_user: "{{postgresql_admin_user}}"
+
+- name: postgres | ensure user does not have unnecessary privilege
+  postgresql_user: name={{item.name}} role_attr_flags=NOSUPERUSER,NOCREATEDB
+  with_items: ssh_users
+  sudo: yes
+  sudo_user: "{{postgresql_admin_user}}"
+
+- name: supervisor | Create the nginx supervisor config file
+  template: src=supervisor_nginx_config.j2 dest=/etc/supervisor/conf.d/nginx.conf backup=yes
+
+- name: supervisor | Create the postgres supervisor config file
+  template: src=supervisor_mysql_config.j2 dest=/etc/supervisor/conf.d/mysql.conf backup=yes
+
+- name: supervisor | Create the mysql supervisor config file
+  template: src=supervisor_mysql_config.j2 dest=/etc/supervisor/conf.d/mysql.conf backup=yes
+
+- name: supervisor | Re-read the Supervisor config files
+  command: supervisorctl reread
+
+- name: supervisor | Update Supervisor to add the app in the process group
+  command: supervisorctl update
+
+- name: ruby-from-src | ensure directory temporary ruby download directory is present
+  file: state=directory path={{rubyTmpDir}}
+
+- name: ruby-from-src | Download ruby source 
+  get_url: url={{rubyUrl}} dest={{rubyTmpDir}}
+
+- name: ruby-from-src | ensure ruby is extracted
+  command: tar -xf {{rubyCompressedFile}} chdir={{rubyTmpDir}} creates={{tmpRubyPath}}
+
+- name: ruby-from-src | ensure ruby is configured
+  command: ./configure chdir={{tmpRubyPath}} creates={{tmpRubyPath}}/Makefile
+
+- name: ruby-from-src | ensure ruby is compiled
+  command: make chdir={{tmpRubyPath}} creates={{tmpRubyPath}}/ruby
+
+- name: ruby-from-src | ensure ruby is installed
+  command: make install chdir={{tmpRubyPath}} creates=/usr/local/bin/ruby
+
+- name: Install bundler
+  gem: name=bundler state=latest
