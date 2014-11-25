@@ -1,16 +1,18 @@
 ---
 - hosts: all
   user: root
-  roles: 
+  roles:
     - common
   vars:
     hostname: example.com
     timezone: America/Los_Angeles
     locale: en_US.UTF-8
     mysql_root_db_pass: SECRET
-    ssh_users: 
+    ssh_users:
       - name: user
         key: "{{ lookup('file', '$HOME/.ssh/id_rsa.pub') }}"
         shell: /bin/bash
+        # This needs to be the md5 summed password http://docs.ansible.com/faq.html#how-do-i-generate-crypted-passwords-for-the-user-module
+        # mkpasswd --method=SHA-512
         password: SECRET
         groups: sudo

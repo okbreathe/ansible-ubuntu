@@ -42,7 +42,7 @@
     - git
     - htop
     - imagemagick
-    - libmysqlclient-dev 
+    - libmysqlclient-dev
     - libpq-dev
     - libreadline6
     - libreadline6-dev
@@ -55,14 +55,13 @@
     - mlocate
     - mysql-client
     - mysql-common
-    - mysql-server 
+    - mysql-server
     - nginx
     - nodejs
     - ntp
     - openssl
-    - openssl
-    - php5-cgi 
-    - php5-cli 
+    - php5-cgi
+    - php5-cli
     - php5-fpm
     - php5-mysql
     - pkg-config
@@ -92,10 +91,15 @@
   notify:
     - restart mysql
 
-- name: mysql | Start the mysql service
+- name: mysql | Ensure mysql is running and starts on boot
   service: name={{ mysql_service }} state=started enabled=yes
 
-- name: mysql | copy .my.cnf file with root password credentials
+# Need to do this for idempotency, see
+# http://ansible.cc/docs/modules.html#mysql-user
+- name: mysql | update mysql root password for all root accounts
+  mysql_user: name=root host=localhost password={{ mysql_root_db_pass }}
+
+- name: mysql | Copy .my.cnf file with root password credentials
   template: src=.my.cnf.j2 dest=~/.my.cnf mode=0600
 
 - name: mysql | update mysql root password for all root accounts
@@ -136,7 +140,7 @@
   template: src=supervisor_nginx_config.j2 dest=/etc/supervisor/conf.d/nginx.conf backup=yes
 
 - name: supervisor | Create the postgres supervisor config file
-  template: src=supervisor_mysql_config.j2 dest=/etc/supervisor/conf.d/mysql.conf backup=yes
+  template: src=supervisor_postgres_config.j2 dest=/etc/supervisor/conf.d/postgres.conf backup=yes
 
 - name: supervisor | Create the mysql supervisor config file
   template: src=supervisor_mysql_config.j2 dest=/etc/supervisor/conf.d/mysql.conf backup=yes
@@ -150,7 +154,7 @@
 - name: ruby-from-src | ensure directory temporary ruby download directory is present
   file: state=directory path={{rubyTmpDir}}
 
-- name: ruby-from-src | Download ruby source 
+- name: ruby-from-src | Download ruby source
   get_url: url={{rubyUrl}} dest={{rubyTmpDir}}
 
 - name: ruby-from-src | ensure ruby is extracted
