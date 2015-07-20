@@ -21,7 +21,7 @@ mysql_service: mysql
 # Ruby
 ## stolen from https://github.com/jgrowl/ansible-playbook-ruby-from-src
 rubyTmpDir: /usr/local/src
-rubyUrl: http://cache.ruby-lang.org/pub/ruby/2.1/ruby-2.1.2.tar.gz
-rubyCompressedFile: ruby-2.1.2.tar.gz
-rubyName: ruby-2.1.2
+rubyUrl: http://cache.ruby-lang.org/pub/ruby/2.1/ruby-2.2.1.tar.gz
+rubyCompressedFile: ruby-2.2.1.tar.gz
+rubyName: ruby-2.2.1
 tmpRubyPath: "{{rubyTmpDir}}/{{rubyName}}"
